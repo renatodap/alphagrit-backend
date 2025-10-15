@@ -1,0 +1,10 @@
+errors:
+  unauthorized: Unauthorized
+  invalid_token: Invalid token
+  rate_limited: Too many requests
+  not_found: Not found
+  bad_request: Bad request
+  forbidden: Forbidden
+messages:
+  health_ok: ok
+  ready_true: true

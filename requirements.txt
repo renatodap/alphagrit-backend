@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+pydantic-settings
+structlog
+orjson
+pytest
+pytest-asyncio
+httpx
+black
+isort
+ruff
+mypy
+pre-commit
+supabase
+stripe
+python-jose[cryptography]
+pyyaml
