@@ -20,12 +20,26 @@ async def get_program(program_id: int, user: dict):
         return None
     membership = (
         supabase.table("user_programs")
-        .select("id")
+        .select("id,tier")
         .eq("user_id", user.get("sub"))
         .eq("program_id", program_id)
         .execute()
     )
-    program["member"] = bool((membership.data if hasattr(membership, "data") else membership) or [])
+    member_data = (membership.data if hasattr(membership, "data") else membership) or []
+    program["member"] = bool(member_data)
+    program["tier"] = member_data[0].get("tier") if member_data else None
+
+    # Check if program has expired
+    program["active"] = True
+    if program.get("end_date"):
+        from datetime import datetime, timezone
+        end_date = program["end_date"]
+        if isinstance(end_date, str):
+            from dateutil import parser
+            end_date = parser.parse(end_date)
+        now = datetime.now(timezone.utc)
+        program["active"] = now <= end_date
+
     return program
 
 
@@ -62,12 +76,14 @@ async def create_program_checkout(program_id: int, user_id: str, tier: str = "st
                 "quantity": 1,
             }
         ]
+    from app.core.config import settings
+    base_url = getattr(settings, 'frontend_url', 'https://wagnerfit.app')
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         line_items=line_items,
         mode="payment",
-        success_url="https://wagnerfit.app/success",
-        cancel_url="https://wagnerfit.app/cancel",
+        success_url=f"{base_url}/success",
+        cancel_url=f"{base_url}/cancel",
     )
     if supabase is not None:
         supabase.table("purchases").insert(

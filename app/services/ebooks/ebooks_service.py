@@ -34,6 +34,9 @@ async def get_ebook_by_slug(slug: str, user: dict):
 
 
 async def create_checkout(ebook_id: int, user_id: str):
+    from app.core.config import settings
+    base_url = getattr(settings, 'frontend_url', 'https://wagnerfit.app')
+
     price_cents = 99900
     price_id = None
     title = "Ebook"
@@ -63,8 +66,8 @@ async def create_checkout(ebook_id: int, user_id: str):
         payment_method_types=["card"],
         line_items=line_items,
         mode="payment",
-        success_url="https://wagnerfit.app/success",
-        cancel_url="https://wagnerfit.app/cancel",
+        success_url=f"{base_url}/success",
+        cancel_url=f"{base_url}/cancel",
     )
 
     if supabase is not None:
@@ -82,6 +85,9 @@ async def create_checkout(ebook_id: int, user_id: str):
 
 
 async def create_combo_checkout(ebook_id: int, user_id: str, tier: str = "standard"):
+    from app.core.config import settings
+    base_url = getattr(settings, 'frontend_url', 'https://wagnerfit.app')
+
     combo_price_id = None
     title = "Ebook + Program"
     price_cents = None
@@ -143,8 +149,8 @@ async def create_combo_checkout(ebook_id: int, user_id: str, tier: str = "standa
         payment_method_types=["card"],
         line_items=line_items,
         mode="payment",
-        success_url="https://wagnerfit.app/success",
-        cancel_url="https://wagnerfit.app/cancel",
+        success_url=f"{base_url}/success",
+        cancel_url=f"{base_url}/cancel",
     )
 
     if supabase is not None:
