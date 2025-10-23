@@ -6,10 +6,11 @@ from app.api.v1.routers import (
     ebooks,
     metrics,
     programs,
-    users,
-    webhooks,
     uploads,
+    users,
     waitlist,
+    webhooks,
+    winter_arc,
 )
 
 api_router = APIRouter()
@@ -26,3 +27,4 @@ api_router.include_router(affiliate.router, prefix="/affiliate", tags=["affiliat
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(uploads.router, prefix="/uploads", tags=["uploads"])
 api_router.include_router(waitlist.router, prefix="/waitlist", tags=["waitlist"])  # POST /api/v1/waitlist
+api_router.include_router(winter_arc.router, prefix="/winter-arc", tags=["winter-arc"])

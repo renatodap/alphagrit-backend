@@ -33,6 +33,11 @@ async def stripe_webhook(request: Request):
     if event_type == "checkout.session.completed" and supabase is not None:
         session_id = data_object.get("id")
         payment_intent = data_object.get("payment_intent")
+
+        # Get metadata from Stripe checkout session
+        # Stripe metadata should include: product_type, tier
+        metadata = data_object.get("metadata", {})
+
         # Flip purchase to paid
         res = (
             supabase.table("purchases")
@@ -43,16 +48,39 @@ async def stripe_webhook(request: Request):
         rows = res.data if hasattr(res, "data") else res
         if rows:
             purchase = rows[0]
+
+            # Determine product_type and tier from purchase metadata or Stripe metadata
+            # Priority: Stripe metadata > Purchase data > Defaults
+            product_type = (
+                metadata.get("product_type")
+                or purchase.get("product_type")
+                or "community_standard"  # default
+            )
+            tier = metadata.get("tier") or purchase.get("tier")
+
+            # Set tier based on product_type if not explicitly provided
+            if tier is None:
+                if product_type == "ebook_only":
+                    tier = None  # No community tier for ebook-only
+                elif product_type == "community_premium":
+                    tier = "premium"
+                else:
+                    tier = "standard"
+
             if purchase.get("item_type") in ("program", "combo") and purchase.get("item_id"):
-                # grant membership for program purchases
+                # Grant membership for program/combo purchases
                 try:
-                    supabase.table("user_programs").insert(
-                        {
-                            "user_id": purchase["user_id"],
-                            "program_id": purchase["item_id"],
-                            "tier": purchase.get("tier") or "standard",
-                        }
-                    ).execute()
+                    enrollment_data = {
+                        "user_id": purchase["user_id"],
+                        "program_id": purchase["item_id"],
+                        "product_type": product_type,
+                    }
+
+                    # Only add tier if it's not None (e.g., community purchases)
+                    if tier is not None:
+                        enrollment_data["tier"] = tier
+
+                    supabase.table("user_programs").insert(enrollment_data).execute()
                 except Exception:
                     pass
     elif event_type == "payment_intent.payment_failed" and supabase is not None:
