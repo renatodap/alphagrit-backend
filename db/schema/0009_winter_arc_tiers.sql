@@ -1,28 +1,66 @@
--- Migration 0009: Winter Arc Tier System
--- Adds tier support for E-book + Community product with Premium tier (Wagner guarantee)
+-- Migration 0009: Winter Arc Tier System (FIXED)
+-- Issue: Check constraints must be added AFTER updating existing data
+-- Fix: Split into add column -> update data -> add constraints
 -- Author: Claude Code
 -- Date: 2025
 
 -- ============================================================================
--- 1. Add tier column to user_programs
+-- 1. Add tier and product_type columns WITHOUT constraints
 -- ============================================================================
 
--- Add tier field: 'standard' or 'premium'
--- NULL for ebook-only purchases (no community access)
 ALTER TABLE user_programs
-ADD COLUMN IF NOT EXISTS tier VARCHAR(20) DEFAULT 'standard'
-CHECK (tier IN ('standard', 'premium') OR tier IS NULL);
+ADD COLUMN IF NOT EXISTS tier VARCHAR(20) DEFAULT NULL;
 
--- Add product_type field to track what was purchased
 ALTER TABLE user_programs
-ADD COLUMN IF NOT EXISTS product_type VARCHAR(30) DEFAULT 'bundle'
-CHECK (product_type IN ('ebook_only', 'community_standard', 'community_premium'));
+ADD COLUMN IF NOT EXISTS product_type VARCHAR(30) DEFAULT NULL;
+
+-- ============================================================================
+-- 2. Update existing enrollments FIRST
+-- ============================================================================
+
+-- Set existing enrollments to community_standard with standard tier
+-- This ensures all rows have valid values before adding constraints
+UPDATE user_programs
+SET tier = 'standard',
+    product_type = 'community_standard'
+WHERE tier IS NULL
+  AND product_type IS NULL;
+
+-- ============================================================================
+-- 3. NOW add CHECK constraints
+-- ============================================================================
+
+-- Add tier constraint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'user_programs_tier_check'
+  ) THEN
+    ALTER TABLE user_programs
+    ADD CONSTRAINT user_programs_tier_check
+    CHECK (tier IN ('standard', 'premium') OR tier IS NULL);
+  END IF;
+END $$;
+
+-- Add product_type constraint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'user_programs_product_type_check'
+  ) THEN
+    ALTER TABLE user_programs
+    ADD CONSTRAINT user_programs_product_type_check
+    CHECK (product_type IN ('ebook_only', 'community_standard', 'community_premium'));
+  END IF;
+END $$;
 
 COMMENT ON COLUMN user_programs.tier IS 'Community tier: standard (default) or premium (Wagner-guaranteed responses). NULL for ebook-only purchases.';
 COMMENT ON COLUMN user_programs.product_type IS 'Product purchased: ebook_only, community_standard, or community_premium';
 
 -- ============================================================================
--- 2. Create indexes for performance
+-- 4. Create indexes for performance
 -- ============================================================================
 
 -- Index for admin queries (Wagner viewing premium posts)
@@ -33,17 +71,6 @@ WHERE tier IS NOT NULL;
 -- Index for access control checks
 CREATE INDEX IF NOT EXISTS idx_user_programs_access
 ON user_programs(user_id, program_id, product_type);
-
--- ============================================================================
--- 3. Update existing enrollments
--- ============================================================================
-
--- Set existing enrollments to community_standard with standard tier
-UPDATE user_programs
-SET tier = 'standard',
-    product_type = 'community_standard'
-WHERE tier IS NULL
-  AND product_type IS NULL;
 
 -- ============================================================================
 -- 4. Add responded tracking for premium posts
