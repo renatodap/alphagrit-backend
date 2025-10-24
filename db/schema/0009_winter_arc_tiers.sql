@@ -65,7 +65,7 @@ COMMENT ON COLUMN user_programs.product_type IS 'Product purchased: ebook_only, 
 
 -- Index for admin queries (Wagner viewing premium posts)
 CREATE INDEX IF NOT EXISTS idx_user_programs_tier
-ON user_programs(program_id, tier, enrolled_at DESC)
+ON user_programs(program_id, tier, created_at DESC)
 WHERE tier IS NOT NULL;
 
 -- Index for access control checks
@@ -106,17 +106,19 @@ ON winter_arc_premium_responses(post_id);
 ALTER TABLE winter_arc_premium_responses ENABLE ROW LEVEL SECURITY;
 
 -- Admin can read/write all
+DROP POLICY IF EXISTS "Admins can manage premium responses" ON winter_arc_premium_responses;
 CREATE POLICY "Admins can manage premium responses"
 ON winter_arc_premium_responses
 FOR ALL
 TO authenticated
 USING (
   auth.uid() IN (
-    SELECT id FROM users WHERE role = 'admin'
+    SELECT user_id FROM user_profiles WHERE is_admin = true
   )
 );
 
 -- Users can see if their post was responded to
+DROP POLICY IF EXISTS "Users can see responses to own posts" ON winter_arc_premium_responses;
 CREATE POLICY "Users can see responses to own posts"
 ON winter_arc_premium_responses
 FOR SELECT
