@@ -67,12 +67,40 @@ async def stripe_webhook(request: Request):
                 else:
                     tier = "standard"
 
-            if purchase.get("item_type") in ("program", "combo") and purchase.get("item_id"):
-                # Grant membership for program/combo purchases
+            # Grant access based on item_type
+            item_type = purchase.get("item_type")
+            item_id = purchase.get("item_id")
+            user_id = purchase["user_id"]
+
+            program_id = None
+
+            # Determine program_id based on item_type
+            if item_type == "ebook":
+                # For ebook purchases, get program_id from ebooks table
+                try:
+                    ebook_res = (
+                        supabase.table("ebooks")
+                        .select("program_id")
+                        .eq("id", item_id)
+                        .limit(1)
+                        .execute()
+                    )
+                    ebook_data = ebook_res.data if hasattr(ebook_res, "data") else ebook_res
+                    if ebook_data:
+                        program_id = ebook_data[0].get("program_id")
+                except Exception:
+                    pass
+
+            elif item_type in ("program", "combo"):
+                # For program/combo purchases, item_id is already the program_id
+                program_id = item_id
+
+            # Grant membership if we have a program_id
+            if program_id and user_id:
                 try:
                     enrollment_data = {
-                        "user_id": purchase["user_id"],
-                        "program_id": purchase["item_id"],
+                        "user_id": user_id,
+                        "program_id": program_id,
                         "product_type": product_type,
                     }
 
@@ -83,6 +111,7 @@ async def stripe_webhook(request: Request):
                     supabase.table("user_programs").insert(enrollment_data).execute()
                 except Exception:
                     pass
+
     elif event_type == "payment_intent.payment_failed" and supabase is not None:
         intent_id = data_object.get("id")
         supabase.table("purchases").update({"status": "failed"}).eq(
