@@ -1,6 +1,6 @@
 from fastapi import Header, HTTPException, Depends
 from app.core.auth import verifier
-from app.infra.supabase.client import get_supabase
+from app.infra.supabase.client import supabase
 
 
 async def get_current_user(authorization: str = Header(...)):
@@ -46,7 +46,6 @@ async def has_ebook_access(user_id: str, program_id: int) -> bool:
     if user_id in ADMIN_USER_IDS:
         return True
 
-    supabase = get_supabase()
     if supabase is None:
         return False
 
@@ -80,7 +79,6 @@ async def has_community_access(user_id: str, program_id: int) -> bool:
     if user_id in ADMIN_USER_IDS:
         return True
 
-    supabase = get_supabase()
     if supabase is None:
         return False
 
@@ -112,7 +110,6 @@ async def is_premium_tier(user_id: str, program_id: int) -> bool:
     if user_id in ADMIN_USER_IDS:
         return True
 
-    supabase = get_supabase()
     if supabase is None:
         return False
 
