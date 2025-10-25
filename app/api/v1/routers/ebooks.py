@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
+from typing import Optional
 
 from app.api.v1.deps.auth import get_current_user
 from app.services.ebooks import ebooks_service
 from app.api.v1.dto.ebook_dto import EbookOut
+from app.core.auth import verifier
 
 router = APIRouter()
 
@@ -13,7 +15,19 @@ async def list_ebooks():
 
 
 @router.get("/{slug}")
-async def get_ebook(slug: str, user=Depends(get_current_user)):
+async def get_ebook(slug: str, authorization: Optional[str] = Header(None)):
+    """
+    Get ebook details. Works for both authenticated and guest users.
+    If authenticated, includes ownership status.
+    """
+    user = None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1]
+        try:
+            user = await verifier.verify(token)
+        except Exception:
+            pass  # Guest user - no auth
+
     return await ebooks_service.get_ebook_by_slug(slug, user)
 
 

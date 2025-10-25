@@ -10,26 +10,44 @@ async def list_ebooks():
     return res.data if hasattr(res, "data") else res
 
 
-async def get_ebook_by_slug(slug: str, user: dict):
+async def get_ebook_by_slug(slug: str, user: dict | None):
+    """
+    Get ebook by slug. Works for both authenticated and guest users.
+
+    Args:
+        slug: Ebook slug (e.g., 'winter-arc')
+        user: User dict from JWT (None if guest/unauthenticated)
+
+    Returns:
+        Ebook dict with 'owned' field (False for guests)
+    """
     if supabase is None:
         return {"slug": slug, "owned": False}
+
     res = supabase.table("ebooks").select("*").eq("slug", slug).limit(1).execute()
     data = res.data if hasattr(res, "data") else res
     ebook = data[0] if data else None
     if not ebook:
         return None
-    # Check ownership (simplified)
-    own = (
-        supabase.table("purchases")
-        .select("id")
-        .eq("user_id", user.get("sub"))
-        .eq("item_type", "ebook")
-        .eq("item_id", ebook["id"])
-        .eq("status", "paid")
-        .execute()
-    )
-    owned = bool((own.data if hasattr(own, "data") else own) or [])
-    ebook["owned"] = owned
+
+    # Check ownership only if user is authenticated
+    if user is not None:
+        user_id = user.get("sub")
+        own = (
+            supabase.table("purchases")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("item_type", "ebook")
+            .eq("item_id", ebook["id"])
+            .eq("status", "paid")
+            .execute()
+        )
+        owned = bool((own.data if hasattr(own, "data") else own) or [])
+        ebook["owned"] = owned
+    else:
+        # Guest user - not owned
+        ebook["owned"] = False
+
     return ebook
 
 
